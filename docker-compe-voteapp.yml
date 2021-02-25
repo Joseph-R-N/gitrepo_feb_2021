@@ -1,0 +1,80 @@
+version: '3.3'
+services:
+  database:
+    image: postgres
+    volumes: 
+      - sqldb:/var/lib/postgresql/data
+      - ./healthchecks:/healthchecks
+    healthcheck:
+      test: /healthchecks/postgres.sh
+      interval: 5s
+    restart: always
+    environment: 
+      POSTGRES_PASSWORD: root123
+      POSTGRES_USER: docker
+    networks: 
+      - backend
+  
+  redis:
+    image: redis:latest-alpine
+    restart: always
+    volumes: 
+      - ./healthchecks:/healthchecks
+    healthcheck:
+      test: /healthchecks/redis.sh
+      interval: 5s
+    ports: 
+      - 6379:6379
+    networks: 
+      - backend
+      - frontend
+  
+  vote:
+    depends_on: 
+      redis:
+        condition: service_healthy
+    image: pragra/vote
+    volumes: 
+      - ./vote:/app
+    ports: 
+      - 7100:80
+    restart: always
+    network:
+      - frontend
+      - backend
+
+  result:
+    depends_on: 
+      database:
+        condition: service_healthy
+    image: pragra/result
+    volumes: 
+      - ./result:/app
+    ports: 
+      - 7500:80
+      - 5858:5858
+    restart: always
+    network:
+      - frontend
+      - backend
+
+  worker:
+    depends_on: 
+      database:
+        condition: service_healthy
+    depends_on: 
+      redis:
+        condition: service_healthy
+    image: pragra/worker
+    volumes: 
+      - ./worker:/app
+    restart: always
+    network:
+      - backend
+
+volumes: 
+  sqldb: {}
+
+networks: 
+  frontend:
+  backend:
